@@ -1,0 +1,5 @@
+apiVersion: conf-sync.com/v1alpha1
+kind: ConfigMapSyncer
+metadata:
+  name: configmapsyncer-sample
+spec: // ... existing code ...

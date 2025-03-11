@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: source-config
+  namespace: default
+data:
+  database.conf: |
+    host=localhost
+    port=5432
+    user=admin
+  app.properties: |
+    log.level=INFO
+    max.connections=100
+    timeout=30s
+  feature.flags: |
+    enable.new.ui=true
+    dark.mode=auto
+    beta.features=false

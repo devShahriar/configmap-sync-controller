@@ -1,0 +1,9 @@
+apiVersion: sync.conf-sync.com/v1alpha1
+kind: ConfigMapSyncer
+metadata:
+  labels:
+    app.kubernetes.io/name: configmap-sync-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: configmapsyncer-sample
+spec:
+  # TODO(user): Add fields here

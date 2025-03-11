@@ -1,0 +1,52 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - conf-sync.com
+  resources:
+  - configmapsyncers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - conf-sync.com
+  resources:
+  - configmapsyncers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - conf-sync.com
+  resources:
+  - configmapsyncers/status
+  verbs:
+  - get
+  - patch
+  - update

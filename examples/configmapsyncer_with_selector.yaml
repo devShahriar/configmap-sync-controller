@@ -1,0 +1,24 @@
+apiVersion: sync.conf-sync.com/v1alpha1
+kind: ConfigMapSyncer
+metadata:
+  name: selector-configmap-syncer
+  namespace: default
+spec:
+  # Reference to the master ConfigMap
+  masterConfigMap:
+    name: source-config
+    namespace: default
+
+  # Target namespaces where the ConfigMap should be propagated
+  targetNamespaces:
+    - app1
+    - app2
+
+  # Target ConfigMaps with these labels
+  targetSelector:
+    matchLabels:
+      app: my-app
+      sync-enabled: "true"
+
+  # Replace strategy will completely replace the target ConfigMap data
+  mergeStrategy: Replace
