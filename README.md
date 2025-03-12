@@ -4,6 +4,22 @@ A Kubernetes controller that synchronizes ConfigMaps across multiple namespaces 
 
 ## 🚀 Quick Start (5 minutes)
 
+### Watch Demo Recording
+
+To see the controller in action without installing anything:
+
+```bash
+# Install asciinema if you haven't already
+brew install asciinema  # macOS
+# or
+apt-get install asciinema  # Ubuntu/Debian
+
+# Play the demo recording
+asciinema play configmap-sync-controller-demo.cast
+```
+
+### Manual Setup
+
 ```bash
 # 1. Clone the repository
 git clone https://github.com/devShahriar/configmap-sync-controller.git
