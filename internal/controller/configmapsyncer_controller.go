@@ -243,6 +243,12 @@ func (r *ConfigMapSyncerReconciler) syncConfigMaps(
 		}
 	}
 
+	// Determine target ConfigMap name
+	targetConfigMapName := masterConfigMap.Name
+	if configMapSyncer.Spec.TargetConfigMapName != "" {
+		targetConfigMapName = configMapSyncer.Spec.TargetConfigMapName
+	}
+
 	// Process each target namespace
 	for _, namespace := range targetNamespaces {
 		// Skip the namespace of the master ConfigMap
@@ -270,18 +276,18 @@ func (r *ConfigMapSyncerReconciler) syncConfigMaps(
 
 			targetConfigMaps = configMapList.Items
 		} else {
-			// If no targetSelector is specified, create/update a ConfigMap with the same name as the master
+			// If no targetSelector is specified, create/update a ConfigMap with the specified name
 			targetConfigMap := &corev1.ConfigMap{}
-			err := r.Get(ctx, types.NamespacedName{Name: masterConfigMap.Name, Namespace: namespace}, targetConfigMap)
+			err := r.Get(ctx, types.NamespacedName{Name: targetConfigMapName, Namespace: namespace}, targetConfigMap)
 			if err != nil {
 				if !errors.IsNotFound(err) {
-					logger.Error(err, "Failed to get target ConfigMap", "namespace", namespace, "name", masterConfigMap.Name)
+					logger.Error(err, "Failed to get target ConfigMap", "namespace", namespace, "name", targetConfigMapName)
 					continue
 				}
 				// ConfigMap doesn't exist, create a new one
 				targetConfigMap = &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      masterConfigMap.Name,
+						Name:      targetConfigMapName,
 						Namespace: namespace,
 						Labels: map[string]string{
 							SourceConfigMapLabel: fmt.Sprintf("%s.%s", masterConfigMap.Namespace, masterConfigMap.Name),

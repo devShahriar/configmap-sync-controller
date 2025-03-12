@@ -29,6 +29,11 @@ type ConfigMapSyncerSpec struct {
 	// +kubebuilder:validation:Required
 	MasterConfigMap ConfigMapReference `json:"masterConfigMap"`
 
+	// TargetConfigMapName is the name to use for target ConfigMaps
+	// If not specified, the name of the master ConfigMap will be used
+	// +optional
+	TargetConfigMapName string `json:"targetConfigMapName,omitempty"`
+
 	// TargetNamespaces is a list of namespaces where the ConfigMap should be propagated
 	// +optional
 	TargetNamespaces []string `json:"targetNamespaces,omitempty"`

@@ -11,7 +11,7 @@ fullnameOverride: ""
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: true
+  create: true # Enable by default for out-of-the-box functionality
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -48,6 +48,7 @@ tolerations: []
 affinity: {}
 
 rbac:
+  # Enable by default for out-of-the-box functionality
   create: true
 
 # CRD configuration

@@ -235,13 +235,11 @@ helm-clean-crds: ## Remove existing CRDs that might conflict with Helm
 	$(KUBECTL) delete crd configmapsyncers.sync.conf-sync.com --ignore-not-found=true
 
 .PHONY: helm-deploy
-helm-deploy: helm-clean-crds ## Deploy using Helm
+helm-deploy: ## Deploy using Helm
 	helm install configmap-sync-controller ./charts/configmap-sync-controller \
 		--set image.repository=$(REGISTRY)/configmap-sync-controller \
 		--set image.tag=$(VERSION) \
 		--namespace $(NAMESPACE) \
-		--create-namespace \
-		--wait
 
 .PHONY: helm-upgrade
 helm-upgrade: ## Upgrade using Helm

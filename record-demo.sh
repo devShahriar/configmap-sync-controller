@@ -27,15 +27,31 @@ kubectl create namespace monitoring
 sleep 3
 
 echo "# Now, let's create a source ConfigMap in the default namespace"
-kubectl apply -f source-configmap.yaml
+kubectl apply -f examples/source-configmap.yaml
+echo "---"
+kubectl apply -f examples/source-configmap.yaml -n app1
+echo "---"
+kubectl apply -f examples/source-configmap.yaml -n app2
+echo "---"
+kubectl apply -f examples/source-configmap.yaml -n monitoring
 sleep 2
 
-echo "# Let's check the source ConfigMap"
+echo "# Let's check the master source ConfigMap"
 kubectl get configmap source-config -o yaml
+echo "---"
+echo "# Let's check the target ConfigMap in app1 namespace"
+kubectl get configmap source-config -n app1 -o yaml
+echo "---"
+echo "# Let's check the target ConfigMap in app2 namespace"
+kubectl get configmap source-config -n app2 -o yaml
+echo "---"
+echo "# Let's check the target ConfigMap in monitoring namespace"
+kubectl get configmap source-config -n monitoring -o yaml
+
 sleep 5
 
 echo "# Now, let's create a ConfigMapSyncer resource to sync the ConfigMap to other namespaces"
-kubectl apply -f configmapsyncer_sample.yaml
+kubectl apply -f examples/configmapsyncer_sample.yaml
 sleep 2
 
 echo "# Let's check the status of the ConfigMapSyncer resource"
@@ -46,34 +62,58 @@ sleep 5
 
 echo "# Now, let's check if the ConfigMap was synced to the target namespaces"
 echo "# Checking app1 namespace:"
-kubectl get configmap -n app1
-sleep 2
+echo "=== Before sync state in app1 namespace ==="
 kubectl get configmap source-config -n app1 -o yaml
-sleep 5
+sleep 2
 
 echo "# Checking app2 namespace:"
-kubectl get configmap -n app2
-sleep 2
+echo "=== Before sync state in app2 namespace ==="
 kubectl get configmap source-config -n app2 -o yaml
-sleep 5
+sleep 2
 
 echo "# Checking monitoring namespace:"
-kubectl get configmap -n monitoring
-sleep 2
+echo "=== Before sync state in monitoring namespace ==="
 kubectl get configmap source-config -n monitoring -o yaml
 sleep 5
 
 echo "# Now, let's update the source ConfigMap and see if the changes are propagated"
+echo "=== Updating source ConfigMap with new data ==="
 kubectl patch configmap source-config --type=merge -p '{"data":{"new-key":"new-value"}}'
 sleep 5
 
 echo "# Let's check if the changes were propagated to the target namespaces"
-echo "# Checking app1 namespace:"
+echo "# Verifying sync in app1 namespace:"
+echo "=== Checking sync status in app1 namespace ==="
 kubectl get configmap source-config -n app1 -o yaml
+if kubectl get configmap source-config -n app1 -o jsonpath='{.data.new-key}' | grep -q "new-value"; then
+    echo "✅ ConfigMap successfully synced to app1 namespace"
+else
+    echo "❌ ConfigMap sync failed in app1 namespace"
+fi
+sleep 2
+
+echo "# Verifying sync in app2 namespace:"
+echo "=== Checking sync status in app2 namespace ==="
+kubectl get configmap source-config -n app2 -o yaml
+if kubectl get configmap source-config -n app2 -o jsonpath='{.data.new-key}' | grep -q "new-value"; then
+    echo "✅ ConfigMap successfully synced to app2 namespace"
+else
+    echo "❌ ConfigMap sync failed in app2 namespace"
+fi
+sleep 2
+
+echo "# Verifying sync in monitoring namespace:"
+echo "=== Checking sync status in monitoring namespace ==="
+kubectl get configmap source-config -n monitoring -o yaml
+if kubectl get configmap source-config -n monitoring -o jsonpath='{.data.new-key}' | grep -q "new-value"; then
+    echo "✅ ConfigMap successfully synced to monitoring namespace"
+else
+    echo "❌ ConfigMap sync failed in monitoring namespace"
+fi
 sleep 5
 
 echo "# Let's try the label selector-based sync"
-kubectl apply -f configmapsyncer_with_selector.yaml
+kubectl apply -f examples/configmapsyncer_with_selector.yaml
 sleep 2
 
 echo "# Create a ConfigMap with matching labels in app1 namespace"
@@ -93,23 +133,24 @@ EOF
 sleep 2
 
 echo "# Let's check if the ConfigMap was synced based on labels"
+echo "=== Checking label-based sync status ==="
 kubectl get configmap target-config -n app1 -o yaml
+if kubectl get configmap target-config -n app1 -o jsonpath='{.metadata.labels.sync-enabled}' | grep -q "true"; then
+    echo "✅ Label-based ConfigMap sync verification successful"
+else
+    echo "❌ Label-based ConfigMap sync verification failed"
+fi
 sleep 5
-
-echo "# Finally, let's clean up"
-kubectl delete configmapsyncer --all
-kubectl delete configmap source-config
-kubectl delete configmap target-config -n app1
-kubectl delete namespace app1
-kubectl delete namespace app2
-kubectl delete namespace monitoring
 
 echo "# Demo completed!"
 sleep 2
+
+kubectl delete configmap source-config
+kubectl delete namespace app1
+kubectl delete namespace app2
+kubectl delete namespace monitoring
 
 # End recording
 # The recording will end when you press Ctrl+D
 
 echo "Demo recording completed. The recording is saved as configmap-sync-controller-demo.cast"
-echo "You can play it with: asciinema play configmap-sync-controller-demo.cast"
-echo "Or upload it to asciinema.org with: asciinema upload configmap-sync-controller-demo.cast" 

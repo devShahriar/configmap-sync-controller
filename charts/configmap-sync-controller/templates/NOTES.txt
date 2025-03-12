@@ -1,0 +1,29 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your ConfigMap Sync Controller has been deployed with all necessary permissions.
+
+To verify the installation:
+
+1. Check if the controller is running:
+   kubectl --namespace {{ .Release.Namespace }} get pods -l "app.kubernetes.io/name={{ include "configmap-sync-controller.name" . }}"
+
+2. Create a test setup:
+   # Create test namespaces
+   kubectl create namespace app1
+   kubectl create namespace app2
+
+   # Create a source ConfigMap
+   kubectl apply -f examples/source-configmap.yaml
+
+   # Create a ConfigMapSyncer
+   kubectl apply -f examples/configmapsyncer_sample.yaml
+
+3. Verify synchronization:
+   # Check source ConfigMap
+   kubectl get configmap source-config -n default -o yaml
+
+   # Check synced ConfigMap in target namespace
+   kubectl get configmap source-config -n app1 -o yaml
+
+For more examples and documentation, visit:
+https://github.com/devShahriar/configmap-sync-controller 

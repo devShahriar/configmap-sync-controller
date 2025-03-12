@@ -1,0 +1,24 @@
+apiVersion: sync.conf-sync.com/v1alpha1
+kind: ConfigMapSyncer
+metadata:
+  name: same-name-syncer
+  namespace: default
+spec:
+  # Reference to the master ConfigMap
+  masterConfigMap:
+    name: source-config
+    namespace: default
+
+  # Target namespaces where the ConfigMap should be propagated
+  targetNamespaces:
+    - app1
+    - app2
+    - monitoring
+
+  # Merge strategy: Replace or Merge (default is Merge)
+  mergeStrategy: Merge
+
+  # Sync interval in seconds (default is 300)
+  syncInterval: 3
+
+  # No targetConfigMapName specified - will use source-config as the name in target namespaces
