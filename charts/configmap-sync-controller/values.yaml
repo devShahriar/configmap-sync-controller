@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: shahriar/configmap-sync-controller
+  repository: configmap-sync-controller
   pullPolicy: IfNotPresent
   tag: "latest"
 
@@ -47,6 +47,13 @@ tolerations: []
 
 affinity: {}
 
+rbac:
+  create: true
+
+# CRD configuration
+crd:
+  create: true # Whether to create/manage the CRD
+
 # Controller configuration
 controller:
   leaderElection:
@@ -55,4 +62,8 @@ controller:
     enabled: true
     service:
       type: ClusterIP
-      port: 8443
+      port: 8080
+
+controllerConfig:
+  syncInterval: 3 # Default sync interval in seconds
+  defaultMergeStrategy: "Merge" # Default merge strategy (Merge or Replace)

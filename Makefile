@@ -1,5 +1,8 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
+REGISTRY ?= your-registry  # Override this with your registry
+VERSION ?= latest
+NAMESPACE ?= configmap-sync-system
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -66,16 +69,13 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
 .PHONY: test-e2e
-test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated environment using Kind.
-	@command -v kind >/dev/null 2>&1 || { \
-		echo "Kind is not installed. Please install Kind manually."; \
+test-e2e: manifests generate fmt vet ## Run e2e tests against the current Kubernetes context
+	@echo "=== Running e2e tests against current Kubernetes context ==="
+	@kubectl cluster-info || { \
+		echo "Error: Unable to connect to Kubernetes cluster. Please ensure your cluster is running and kubectl is configured correctly."; \
 		exit 1; \
 	}
-	@kind get clusters | grep -q 'kind' || { \
-		echo "No Kind cluster is running. Please start a Kind cluster before running the e2e tests."; \
-		exit 1; \
-	}
-	go test ./test/e2e/ -v -ginkgo.v
+	go test ./test/e2e -v -ginkgo.v
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
@@ -222,3 +222,83 @@ mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $(1)-$(3) $(1)
 endef
+
+##@ Build and Deploy
+
+.PHONY: docker-build-push
+docker-build-push: ## Build and push docker image
+	$(CONTAINER_TOOL) build -t $(REGISTRY)/configmap-sync-controller:$(VERSION) .
+	$(CONTAINER_TOOL) push $(REGISTRY)/configmap-sync-controller:$(VERSION)
+
+.PHONY: helm-clean-crds
+helm-clean-crds: ## Remove existing CRDs that might conflict with Helm
+	$(KUBECTL) delete crd configmapsyncers.sync.conf-sync.com --ignore-not-found=true
+
+.PHONY: helm-deploy
+helm-deploy: helm-clean-crds ## Deploy using Helm
+	helm install configmap-sync-controller ./charts/configmap-sync-controller \
+		--set image.repository=$(REGISTRY)/configmap-sync-controller \
+		--set image.tag=$(VERSION) \
+		--namespace $(NAMESPACE) \
+		--create-namespace \
+		--wait
+
+.PHONY: helm-upgrade
+helm-upgrade: ## Upgrade using Helm
+	helm upgrade configmap-sync-controller ./charts/configmap-sync-controller \
+		--set image.repository=$(REGISTRY)/configmap-sync-controller \
+		--set image.tag=$(VERSION) \
+		--namespace $(NAMESPACE) \
+		--wait
+
+.PHONY: helm-uninstall
+helm-uninstall: ## Uninstall using Helm
+	helm uninstall configmap-sync-controller -n $(NAMESPACE)
+
+.PHONY: deploy-all
+deploy-all: docker-build-push helm-deploy ## Build, push and deploy using Helm
+
+##@ Status Checks
+
+.PHONY: check-crd
+check-crd: ## Check CRD status and details
+	@echo "=== Checking ConfigMapSyncer CRD ==="
+	$(KUBECTL) get crd configmapsyncers.sync.conf-sync.com
+	@echo "\n=== CRD Details ==="
+	$(KUBECTL) describe crd configmapsyncers.sync.conf-sync.com
+
+.PHONY: list-resources
+list-resources: ## List all ConfigMapSyncer resources
+	@echo "=== Listing ConfigMapSyncer resources ==="
+	$(KUBECTL) get configmapsyncers --all-namespaces
+	@echo "\n=== Listing related ConfigMaps ==="
+	$(KUBECTL) get configmaps --all-namespaces -l configmapsyncer.conf-sync.com/source
+
+##@ Debugging and Status
+
+.PHONY: debug-controller
+debug-controller: ## Check controller deployment and logs
+	@echo "\n=== Controller Pod Status ==="
+	$(KUBECTL) get pods -n $(NAMESPACE) -l app.kubernetes.io/name=configmap-sync-controller
+	@echo "\n=== Controller Logs ==="
+	$(KUBECTL) logs -n $(NAMESPACE) -l app.kubernetes.io/name=configmap-sync-controller --tail=100
+
+.PHONY: check-sync-status
+check-sync-status: ## Check sync status of ConfigMapSyncers
+	@echo "\n=== ConfigMapSyncer Resources ==="
+	$(KUBECTL) get configmapsyncers --all-namespaces -o wide
+	@echo "\n=== ConfigMapSyncer Details ==="
+	$(KUBECTL) get configmapsyncers --all-namespaces -o yaml | grep -A 10 "status:"
+
+.PHONY: check-configmaps
+check-configmaps: ## Check source and target ConfigMaps
+	@echo "\n=== Source ConfigMaps ==="
+	$(KUBECTL) get configmaps --all-namespaces
+	@echo "\n=== Target ConfigMaps ==="
+	for ns in $$($(KUBECTL) get configmapsyncers -o jsonpath='{.items[*].spec.targetNamespaces[*]}'); do \
+		echo "\nNamespace: $$ns"; \
+		$(KUBECTL) get configmaps -n $$ns; \
+	done
+
+.PHONY: debug-all
+debug-all: debug-controller check-sync-status check-configmaps ## Run all debugging checks

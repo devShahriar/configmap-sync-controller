@@ -1,199 +1,312 @@
 # ConfigMap Sync Controller
 
-A Kubernetes controller that watches a "master" ConfigMap in one namespace and automatically propagates its changes (merging) to ConfigMaps in target namespaces.
+A Kubernetes controller that synchronizes ConfigMaps across multiple namespaces with configurable sync intervals and merge strategies.
 
-## Overview
+## Architecture
 
-The ConfigMap Sync Controller allows you to define a "master" ConfigMap in one namespace and automatically sync its contents to ConfigMaps in other namespaces. This is useful for maintaining consistent configuration across multiple namespaces, such as:
+### Components and Their Relationships
 
-- Sharing common configuration across multiple applications
-- Propagating global settings to different environments
-- Centralizing configuration management
+1. **Controller Deployment**
 
-The controller introduces a Custom Resource Definition (CRD) called `ConfigMapSyncer` which allows you to specify:
+   - The controller runs as a deployment in the `configmap-sync-controller-system` namespace
+   - It watches for ConfigMapSyncer resources across all namespaces
+   - Handles the actual synchronization of ConfigMaps based on ConfigMapSyncer specifications
 
-- The source ConfigMap to sync from
-- Target namespaces to sync to
-- Optional label selectors to target specific ConfigMaps
-- Merge strategy (Replace or Merge)
+2. **Custom Resource Definition (CRD)**
+
+   - The ConfigMapSyncer CRD defines the schema for ConfigMapSyncer resources
+   - Installed using `make install` command
+   - Extends the Kubernetes API to understand ConfigMapSyncer resources
+
+3. **ConfigMapSyncer Resources**
+   - These are instances of the ConfigMapSyncer CRD
+   - Should be stored in your application's configuration directory (e.g., `config/samples/` or `manifests/`)
+   - Can be created in any namespace (the controller watches all namespaces)
+   - Define the sync rules for specific ConfigMaps
+
+### Directory Structure
+
+```
+configmap-sync-controller/
+├── config/                    # Controller configuration
+│   ├── crd/                  # Custom Resource Definitions
+│   ├── rbac/                 # RBAC permissions
+│   └── manager/              # Controller manager configuration
+├── manifests/                # Your ConfigMapSyncer resources (recommended)
+│   ├── source-config.yaml    # Source ConfigMap
+│   └── syncer.yaml          # ConfigMapSyncer configuration
+└── ...
+```
+
+### Workflow
+
+1. Deploy the controller (`make deploy`)
+2. Create your ConfigMap resources
+3. Create ConfigMapSyncer resources to define sync rules
+4. The controller automatically detects and processes the ConfigMapSyncer resources
 
 ## Features
 
-- **Namespace-based targeting**: Sync to specific namespaces or all namespaces
-- **Label-based targeting**: Target ConfigMaps with specific labels
-- **Flexible merge strategies**: Choose between replacing or merging ConfigMap data
-- **Status tracking**: Monitor sync status through the ConfigMapSyncer status
-- **Automatic reconciliation**: Periodically checks for changes and syncs as needed
+- Synchronize ConfigMaps across multiple namespaces
+- Configurable sync interval (default: 3 seconds)
+- Support for merge strategies
+- Real-time updates when source ConfigMap changes
+- Kubernetes operator pattern implementation
+
+## Prerequisites
+
+- Kubernetes cluster (v1.19+)
+- kubectl configured to access your cluster
+- Docker installed for building images
+- Go 1.19+ (for development)
 
 ## Installation
 
-### Prerequisites
+### 1. Clone the Repository
 
-- Kubernetes cluster v1.19+
-- kubectl v1.19+
-- Go v1.19+ (for development)
-
-### Installing the Controller
-
-1. Clone the repository:
-
-```sh
-git clone https://github.com/shahriar-siemens/configmap-sync-controller.git
+```bash
+git clone https://github.com/devShahriar/configmap-sync-controller.git
 cd configmap-sync-controller
 ```
 
-2. Install the CRDs:
+### 2. Build and Deploy the Controller
 
-```sh
+```bash
+# Build the controller image
+make docker-build IMG=configmap-sync-controller:latest
+
+# Install CRDs
 make install
+
+# Deploy the controller
+make deploy IMG=configmap-sync-controller:latest
 ```
 
-3. Run the controller (development mode):
+To verify the installation:
 
-```sh
-make run
-```
+```bash
+# Check if the controller is running
+kubectl get pods -n configmap-sync-controller-system
 
-### Deploying to a Cluster
-
-1. Build and push the Docker image:
-
-```sh
-make docker-build docker-push IMG=<your-registry>/configmap-sync-controller:latest
-```
-
-2. Deploy the controller:
-
-```sh
-make deploy IMG=<your-registry>/configmap-sync-controller:latest
+# Check if CRDs are installed
+kubectl get crd | grep configmapsyncers
 ```
 
 ## Usage
 
-### Creating a ConfigMapSyncer Resource
+### 1. Namespace Setup
 
-1. Create a source ConfigMap:
+First, create the required namespaces for your configuration:
+
+```bash
+# Create namespaces for your applications
+kubectl create namespace app1
+kubectl create namespace app2
+kubectl create namespace monitoring
+
+# Verify namespaces are created
+kubectl get namespaces | grep -E 'app1|app2|monitoring'
+```
+
+### 2. Source ConfigMap Management
+
+The source ConfigMap is the master configuration that will be synchronized to other namespaces.
+
+#### Create Source ConfigMap in Default Namespace
 
 ```yaml
+# source-config.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: source-config
-  namespace: default
+  namespace: default # Source namespace
 data:
   app.properties: |
-    app.name=MyApp
-    app.version=1.0.0
-    app.environment=production
+    log.level=INFO
+    max.connections=100
+    timeout=30s
+  db.properties: |
+    db.url=jdbc:mysql://localhost:3306/mydb
+    db.user=admin
 ```
 
-2. Create a ConfigMapSyncer resource:
+Apply the source ConfigMap:
+
+```bash
+kubectl apply -f source-config.yaml
+```
+
+Verify the source ConfigMap:
+
+```bash
+kubectl get configmap source-config -n default -o yaml
+```
+
+### 3. ConfigMap Synchronization
+
+#### Create ConfigMapSyncer Resource
+
+This defines how your ConfigMap should be synchronized across namespaces:
 
 ```yaml
-apiVersion: sync.siemens.com/v1alpha1
+# configmap-syncer.yaml
+apiVersion: sync.conf-sync.com/v1alpha1
 kind: ConfigMapSyncer
 metadata:
-  name: sample-configmap-syncer
-  namespace: default
+  name: test-syncer
+  namespace: default # The syncer can be in any namespace
 spec:
   masterConfigMap:
     name: source-config
-    namespace: default
-  targetNamespaces:
-    - app1
-    - app2
-    - monitoring
-  mergeStrategy: Merge
+    namespace: default # Source ConfigMap namespace
+  targetNamespaces: # List of target namespaces
+    - app1 # First application namespace
+    - app2 # Second application namespace
+    - monitoring # Monitoring namespace
+  mergeStrategy: Merge # How to handle existing ConfigMaps
+  syncInterval: 3 # Sync every 3 seconds
 ```
 
-### Using Label Selectors
+Apply the ConfigMapSyncer:
 
-You can use label selectors to target specific ConfigMaps:
-
-```yaml
-apiVersion: sync.siemens.com/v1alpha1
-kind: ConfigMapSyncer
-metadata:
-  name: selector-configmap-syncer
-  namespace: default
-spec:
-  masterConfigMap:
-    name: source-config
-    namespace: default
-  targetNamespaces:
-    - app1
-    - app2
-  targetSelector:
-    matchLabels:
-      app: my-app
-      sync-enabled: "true"
-  mergeStrategy: Replace
+```bash
+kubectl apply -f configmap-syncer.yaml
 ```
 
-### Checking Sync Status
+#### Verify Synchronization
 
-You can check the status of the ConfigMapSyncer resource:
+1. Check ConfigMaps in Each Namespace:
 
-```sh
-kubectl get configmapsyncers -o wide
-kubectl describe configmapsyncer sample-configmap-syncer
+```bash
+# Check source ConfigMap
+kubectl get configmap source-config -n default -o yaml
+
+# Check synchronized ConfigMaps in target namespaces
+kubectl get configmap source-config -n app1 -o yaml
+kubectl get configmap source-config -n app2 -o yaml
+kubectl get configmap source-config -n monitoring -o yaml
 ```
 
-## API Reference
+2. Verify Data Consistency:
 
-### ConfigMapSyncer
+```bash
+# Compare ConfigMap data across namespaces
+for ns in default app1 app2 monitoring; do
+  echo "=== Namespace: $ns ==="
+  kubectl get configmap source-config -n $ns -o jsonpath='{.data}' | jq .
+done
+```
 
-| Field                   | Type               | Description                                                              |
-| ----------------------- | ------------------ | ------------------------------------------------------------------------ |
-| `spec.masterConfigMap`  | ConfigMapReference | Reference to the source ConfigMap                                        |
-| `spec.targetNamespaces` | []string           | List of namespaces to sync to (optional)                                 |
-| `spec.targetSelector`   | LabelSelector      | Label selector to target specific ConfigMaps (optional)                  |
-| `spec.mergeStrategy`    | string             | Strategy for merging ConfigMaps: "Replace" or "Merge" (default: "Merge") |
+### 4. Testing Updates
 
-### ConfigMapReference
+#### Update Source ConfigMap
 
-| Field       | Type   | Description                |
-| ----------- | ------ | -------------------------- |
-| `name`      | string | Name of the ConfigMap      |
-| `namespace` | string | Namespace of the ConfigMap |
+```bash
+# Update a single property
+kubectl patch configmap source-config -n default --type=merge -p '{"data":{"app.properties":"log.level=DEBUG\nmax.connections=200\ntimeout=60s"}}'
 
-## Examples
+# Add new property
+kubectl patch configmap source-config -n default --type=merge -p '{"data":{"new.property":"value1"}}'
+```
 
-Check the [examples](./examples) directory for sample ConfigMapSyncer resources and test scripts.
+#### Verify Updates are Synchronized
 
-## Development
+```bash
+# Wait for sync interval (3 seconds)
+sleep 4
 
-### Prerequisites
+# Check updates in target namespaces
+for ns in app1 app2 monitoring; do
+  echo "=== Checking namespace: $ns ==="
+  kubectl get configmap source-config -n $ns -o yaml
+done
+```
 
-- Go v1.19+
-- Kubebuilder v3.0.0+
-- Docker
+### 5. Cleanup
 
-### Building and Testing
+To remove synchronized ConfigMaps:
 
-```sh
-# Run tests
+```bash
+# Delete ConfigMapSyncer (stops synchronization)
+kubectl delete configmapsyncer test-syncer -n default
+
+# Delete ConfigMaps from all namespaces
+for ns in default app1 app2 monitoring; do
+  kubectl delete configmap source-config -n $ns
+done
+
+# Optionally, delete namespaces
+kubectl delete namespace app1
+kubectl delete namespace app2
+kubectl delete namespace monitoring
+```
+
+## Available Make Commands
+
+The following make commands are available for development and deployment:
+
+### Build and Deploy
+
+- `make docker-build IMG=<image-name>` - Build the controller image
+- `make deploy IMG=<image-name>` - Deploy the controller to the cluster
+- `make undeploy` - Remove the controller from the cluster
+- `make install` - Install CRDs into the cluster
+- `make uninstall` - Remove CRDs from the cluster
+
+### Development
+
+- `make manifests` - Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects
+- `make generate` - Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations
+- `make fmt` - Run go fmt against code
+- `make vet` - Run go vet against code
+- `make test` - Run tests
+- `make test-e2e` - Run end-to-end tests
+
+### Debug and Status
+
+- `make debug-controller` - Check controller deployment and logs
+- `make check-crd` - Check CRD status and details
+- `make list-resources` - List all ConfigMapSyncer resources
+- `make check-sync-status` - Check sync status of ConfigMapSyncers
+- `make check-configmaps` - Check source and target ConfigMaps
+- `make debug-all` - Run all debugging checks
+
+## Running Tests
+
+### Unit Tests
+
+```bash
 make test
+```
 
-# Build the controller
-make build
+### End-to-End Tests
 
-# Run the controller locally
-make run
+```bash
+# Run e2e tests
+make test-e2e
+```
+
+## Troubleshooting
+
+### Check Controller Logs
+
+```bash
+make debug-controller
+```
+
+### Check Sync Status
+
+```bash
+make check-sync-status
+```
+
+### Check ConfigMaps
+
+```bash
+make check-configmaps
 ```
 
 ## License
 
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.

@@ -7,7 +7,7 @@ metadata:
     {{- include "configmap-sync-controller.labels" . | nindent 4 }}
 rules:
 - apiGroups:
-  - sync.siemens.com
+  - sync.conf-sync.com
   resources:
   - configmapsyncers
   verbs:
@@ -19,13 +19,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - sync.siemens.com
+  - sync.conf-sync.com
   resources:
   - configmapsyncers/finalizers
   verbs:
   - update
 - apiGroups:
-  - sync.siemens.com
+  - sync.conf-sync.com
   resources:
   - configmapsyncers/status
   verbs:

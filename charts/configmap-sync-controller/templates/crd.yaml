@@ -1,0 +1,125 @@
+{{- if .Values.crd.create }}
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: configmapsyncers.sync.conf-sync.com
+  labels:
+    {{- include "configmap-sync-controller.labels" . | nindent 4 }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+    helm.sh/resource-policy: keep
+spec:
+  group: sync.conf-sync.com
+  names:
+    kind: ConfigMapSyncer
+    listKind: ConfigMapSyncerList
+    plural: configmapsyncers
+    singular: configmapsyncer
+    shortNames:
+      - cms
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - jsonPath: .status.conditions[?(@.type=="Ready")].status
+          name: Status
+          type: string
+        - jsonPath: .metadata.creationTimestamp
+          name: Age
+          type: date
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - masterConfigMap
+              properties:
+                masterConfigMap:
+                  type: object
+                  required:
+                    - name
+                    - namespace
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                targetNamespaces:
+                  type: array
+                  items:
+                    type: string
+                targetSelector:
+                  type: object
+                  properties:
+                    matchLabels:
+                      type: object
+                      additionalProperties:
+                        type: string
+                mergeStrategy:
+                  type: string
+                  enum:
+                    - Replace
+                    - Merge
+                  default: Merge
+                syncInterval:
+                  type: integer
+                  minimum: 1
+                  default: 300
+            status:
+              type: object
+              properties:
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                syncStatuses:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - configMapName
+                      - namespace
+                      - status
+                    properties:
+                      configMapName:
+                        type: string
+                      namespace:
+                        type: string
+                      lastSyncTime:
+                        type: string
+                        format: date-time
+                      status:
+                        type: string
+                        enum:
+                          - Pending
+                          - Synced
+                          - Failed
+                      message:
+                        type: string
+                lastSyncTime:
+                  type: string
+                  format: date-time
+      subresources:
+        status: {}
+{{- end }} 

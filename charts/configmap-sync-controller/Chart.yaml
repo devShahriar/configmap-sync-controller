@@ -1,14 +1,20 @@
 apiVersion: v2
 name: configmap-sync-controller
-description: A Helm chart for the ConfigMap Sync Controller
+description: A Helm chart for deploying the ConfigMap Sync Controller
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
+
+maintainers:
+  - name: Shahriar
+    email: your.email@example.com
+
 keywords:
   - kubernetes
   - configmap
   - sync
   - controller
-maintainers:
-  - name: Shahriar
-    email: shahriar@siemens.com
+
+home: https://github.com/devShahriar/configmap-sync-controller
+sources:
+  - https://github.com/devShahriar/configmap-sync-controller

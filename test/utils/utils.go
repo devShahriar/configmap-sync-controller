@@ -54,7 +54,14 @@ func Run(cmd *exec.Cmd) (string, error) {
 	_, _ = fmt.Fprintf(GinkgoWriter, "running: %s\n", command)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("%s failed with error: (%v) %s", command, err, string(output))
+		return string(
+				output,
+			), fmt.Errorf(
+				"%s failed with error: (%v) %s",
+				command,
+				err,
+				string(output),
+			)
 	}
 
 	return string(output), nil
@@ -87,7 +94,13 @@ func IsPrometheusCRDsInstalled() bool {
 		"prometheusagents.monitoring.coreos.com",
 	}
 
-	cmd := exec.Command("kubectl", "get", "crds", "-o", "custom-columns=NAME:.metadata.name")
+	cmd := exec.Command(
+		"kubectl",
+		"get",
+		"crds",
+		"-o",
+		"custom-columns=NAME:.metadata.name",
+	)
 	output, err := Run(cmd)
 	if err != nil {
 		return false
@@ -187,7 +200,6 @@ func GetNonEmptyLines(output string) []string {
 			res = append(res, element)
 		}
 	}
-
 	return res
 }
 
@@ -204,8 +216,6 @@ func GetProjectDir() (string, error) {
 // UncommentCode searches for target in the file and remove the comment prefix
 // of the target content. The target content may span multiple lines.
 func UncommentCode(filename, target, prefix string) error {
-	// false positive
-	// nolint:gosec
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		return err
@@ -232,7 +242,6 @@ func UncommentCode(filename, target, prefix string) error {
 		if err != nil {
 			return err
 		}
-		// Avoid writing a newline in case the previous line was the last in target.
 		if !scanner.Scan() {
 			break
 		}
@@ -245,7 +254,5 @@ func UncommentCode(filename, target, prefix string) error {
 	if err != nil {
 		return err
 	}
-	// false positive
-	// nolint:gosec
 	return os.WriteFile(filename, out.Bytes(), 0644)
 }
